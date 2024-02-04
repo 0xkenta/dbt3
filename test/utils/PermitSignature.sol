@@ -38,7 +38,7 @@ contract PermitSignature {
             )
         );
 
-              (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, msgHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(privateKey, msgHash);
         return bytes.concat(r, s, bytes1(v));
     }
 

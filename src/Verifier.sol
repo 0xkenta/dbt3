@@ -17,6 +17,14 @@ contract Verifier {
 
     function execute(SenderOrder calldata _senderOrder) external {
         SenderOrderDetail memory orderDetail = abi.decode(_senderOrder.order, (SenderOrderDetail));
-        permit2.permitWitnessTransferFrom(orderDetail.permit, orderDetail.transferDetails, orderDetail.owner, orderDetail.witness, WITNESS_TYPE_STRING, _senderOrder.signature);
+
+        permit2.permitWitnessTransferFrom(
+            orderDetail.permit,
+            orderDetail.transferDetails,
+            orderDetail.owner,
+            orderDetail.witness,
+            WITNESS_TYPE_STRING,
+            _senderOrder.signature
+        );
     }
 }

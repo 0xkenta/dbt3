@@ -4,6 +4,7 @@ pragma solidity 0.8.23;
 import {Test, console2} from "forge-std/Test.sol";
 import {IPermit2} from "permit2/interfaces/IPermit2.sol";
 import {ISignatureTransfer} from "permit2/interfaces/ISignatureTransfer.sol";
+import {SignatureVerification} from "permit2/libraries/SignatureVerification.sol";
 import {MockERC20} from "./mock/MockERC20.sol";
 import {AddressBuilder} from "./utils/AddressBuilder.sol";
 import {PermitSignature} from "./utils/PermitSignature.sol";
@@ -56,9 +57,9 @@ contract VeriferTest is Test, PermitSignature {
         token2.mint(sender, DEFAULT_BALANCE);
 
         vm.startPrank(sender);
-        token1.approve(permit2, type(uint256).max);        
+        token1.approve(permit2, type(uint256).max);
         token2.approve(permit2, type(uint256).max);
-        vm.stopPrank();        
+        vm.stopPrank();
     }
 
     function test_initialize() public {
@@ -89,7 +90,7 @@ contract VeriferTest is Test, PermitSignature {
         ISignatureTransfer.SignatureTransferDetails[] memory toAmountPairs =
             StructBuilder.fillSigTransferDetails(DEFAULT_AMOUNT, to);
 
-        SenderOrder memory senderOrder = SenderOrder(abi.encode(SenderOrderDetail(permit, toAmountPairs, sender, witness)), sig);
+        SenderOrder memory senderOrder = _getSenderOrder(permit, toAmountPairs, sender, witness, sig);
 
         uint256 senderToken1Before = token1.balanceOf(sender);
         uint256 recipientToken1Before = token1.balanceOf(recipient);
@@ -98,12 +99,12 @@ contract VeriferTest is Test, PermitSignature {
         assertEq(feeReceiverToken1Before, 0);
 
         verifier.execute(senderOrder);
-    
+
         uint256 senderToken1After = token1.balanceOf(sender);
         uint256 recipientToken1After = token1.balanceOf(recipient);
         uint256 feeReceiverToken1After = token1.balanceOf(feeReceiver);
         assertEq(senderToken1After, senderToken1Before - DEFAULT_AMOUNT * 2);
-        assertEq(recipientToken1After, recipientToken1Before +  DEFAULT_AMOUNT);
+        assertEq(recipientToken1After, recipientToken1Before + DEFAULT_AMOUNT);
         assertEq(feeReceiverToken1After, feeReceiverToken1Before + DEFAULT_AMOUNT);
     }
 
@@ -116,13 +117,13 @@ contract VeriferTest is Test, PermitSignature {
 
         bytes memory sig = getPermitBatchWitnessSignature(
             permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(verifier)
-        );    
+        );
 
         address[] memory to = AddressBuilder.fill(1, address(recipient)).push(address(feeReceiver));
         ISignatureTransfer.SignatureTransferDetails[] memory toAmountPairs =
             StructBuilder.fillSigTransferDetails(DEFAULT_AMOUNT, to);
 
-        SenderOrder memory senderOrder = SenderOrder(abi.encode(SenderOrderDetail(permit, toAmountPairs, sender, witness)), sig);
+        SenderOrder memory senderOrder = _getSenderOrder(permit, toAmountPairs, sender, witness, sig);
 
         uint256 senderToken1Before = token1.balanceOf(sender);
         uint256 senderToken2Before = token2.balanceOf(sender);
@@ -136,7 +137,7 @@ contract VeriferTest is Test, PermitSignature {
         assertEq(feeReceiverToken2Before, 0);
 
         verifier.execute(senderOrder);
-    
+
         uint256 senderToken1After = token1.balanceOf(sender);
         uint256 senderToken2After = token2.balanceOf(sender);
         uint256 recipientToken1After = token1.balanceOf(recipient);
@@ -145,9 +146,45 @@ contract VeriferTest is Test, PermitSignature {
         uint256 feeReceiverToken2After = token2.balanceOf(feeReceiver);
         assertEq(senderToken1After, senderToken1Before - DEFAULT_AMOUNT);
         assertEq(senderToken2After, senderToken2Before - DEFAULT_AMOUNT);
-        assertEq(recipientToken1After, recipientToken1Before +  DEFAULT_AMOUNT);
+        assertEq(recipientToken1After, recipientToken1Before + DEFAULT_AMOUNT);
         assertEq(recipientToken2After, recipientToken2Before);
         assertEq(feeReceiverToken1After, feeReceiverToken1Before);
         assertEq(feeReceiverToken2After, feeReceiverToken2Before + DEFAULT_AMOUNT);
+    }
+
+    function test_invalid_sender_signature_length() public {
+        uint256 nonce = 0;
+        Witness memory witnessData = Witness(recipient);
+        bytes32 witness = keccak256(abi.encode(witnessData));
+        address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
+        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT);
+
+        bytes memory sig = getPermitBatchWitnessSignature(
+            permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(verifier)
+        );
+        bytes memory sigExtra = bytes.concat(sig, bytes1(uint8(0)));
+        assertEq(sigExtra.length, 66);
+
+        address[] memory to = AddressBuilder.fill(1, address(recipient)).push(address(feeReceiver));
+        ISignatureTransfer.SignatureTransferDetails[] memory toAmountPairs =
+            StructBuilder.fillSigTransferDetails(DEFAULT_AMOUNT, to);
+
+        SenderOrder memory senderOrder = _getSenderOrder(permit, toAmountPairs, sender, witness, sigExtra);
+
+        vm.expectRevert(SignatureVerification.InvalidSignatureLength.selector);
+        verifier.execute(senderOrder);
+    }
+
+    function _getSenderOrder(
+        ISignatureTransfer.PermitBatchTransferFrom memory _permit,
+        ISignatureTransfer.SignatureTransferDetails[] memory _toAmountPairs,
+        address _owner,
+        bytes32 _witness,
+        bytes memory _signature
+    ) private returns (SenderOrder memory) {
+        SenderOrder memory senderOrder =
+            SenderOrder(abi.encode(SenderOrderDetail(_permit, _toAmountPairs, _owner, _witness)), _signature);
+
+        return senderOrder;
     }
 }

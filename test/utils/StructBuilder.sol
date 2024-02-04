@@ -12,5 +12,5 @@ library StructBuilder {
         for (uint256 i = 0; i < tos.length; ++i) {
             transferDetails[i] = ISignatureTransfer.SignatureTransferDetails({to: tos[i], requestedAmount: amount});
         }
-    }    
+    }
 }
