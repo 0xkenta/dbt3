@@ -2,6 +2,7 @@
 pragma solidity ^0.8.13;
 
 import {IPermit2} from "permit2/interfaces/IPermit2.sol";
+import {ISignatureTransfer} from "permit2/interfaces/ISignatureTransfer.sol";
 
 contract Verifier {
     IPermit2 public permit2;
