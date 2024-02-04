@@ -9,6 +9,7 @@ import {AddressBuilder} from "./utils/AddressBuilder.sol";
 import {PermitSignature} from "./utils/PermitSignature.sol";
 import {StructBuilder} from "./utils/StructBuilder.sol";
 import {Verifier} from "../src/Verifier.sol";
+import {SenderOrder, SenderOrderDetail} from "../src/OrderStructs.sol";
 
 contract VeriferTest is Test, PermitSignature {
     using AddressBuilder for address[];
@@ -88,13 +89,15 @@ contract VeriferTest is Test, PermitSignature {
         ISignatureTransfer.SignatureTransferDetails[] memory toAmountPairs =
             StructBuilder.fillSigTransferDetails(DEFAULT_AMOUNT, to);
 
+        SenderOrder memory senderOrder = SenderOrder(abi.encode(SenderOrderDetail(permit, toAmountPairs, sender, witness)), sig);
+
         uint256 senderToken1Before = token1.balanceOf(sender);
         uint256 recipientToken1Before = token1.balanceOf(recipient);
         uint256 feeReceiverToken1Before = token1.balanceOf(feeReceiver);
         assertEq(recipientToken1Before, 0);
         assertEq(feeReceiverToken1Before, 0);
 
-        verifier.execute(permit, toAmountPairs, sender, witness, sig);
+        verifier.execute(senderOrder);
     
         uint256 senderToken1After = token1.balanceOf(sender);
         uint256 recipientToken1After = token1.balanceOf(recipient);
@@ -119,6 +122,8 @@ contract VeriferTest is Test, PermitSignature {
         ISignatureTransfer.SignatureTransferDetails[] memory toAmountPairs =
             StructBuilder.fillSigTransferDetails(DEFAULT_AMOUNT, to);
 
+        SenderOrder memory senderOrder = SenderOrder(abi.encode(SenderOrderDetail(permit, toAmountPairs, sender, witness)), sig);
+
         uint256 senderToken1Before = token1.balanceOf(sender);
         uint256 senderToken2Before = token2.balanceOf(sender);
         uint256 recipientToken1Before = token1.balanceOf(recipient);
@@ -130,7 +135,7 @@ contract VeriferTest is Test, PermitSignature {
         assertEq(feeReceiverToken1Before, 0);
         assertEq(feeReceiverToken2Before, 0);
 
-        verifier.execute(permit, toAmountPairs, sender, witness, sig);
+        verifier.execute(senderOrder);
     
         uint256 senderToken1After = token1.balanceOf(sender);
         uint256 senderToken2After = token2.balanceOf(sender);

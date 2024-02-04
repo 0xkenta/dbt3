@@ -3,6 +3,7 @@ pragma solidity 0.8.23;
 
 import {IPermit2} from "permit2/interfaces/IPermit2.sol";
 import {ISignatureTransfer} from "permit2/interfaces/ISignatureTransfer.sol";
+import {SenderOrder, SenderOrderDetail} from "./OrderStructs.sol";
 
 contract Verifier {
     string public constant WITNESS_TYPE_STRING =
@@ -14,13 +15,8 @@ contract Verifier {
         permit2 = IPermit2(_permit2);
     }
 
-    function execute(
-        ISignatureTransfer.PermitBatchTransferFrom memory permit,
-        ISignatureTransfer.SignatureTransferDetails[] calldata transferDetails,
-        address owner,
-        bytes32 witness,
-        bytes calldata signature
-    ) external {
-        permit2.permitWitnessTransferFrom(permit, transferDetails, owner, witness, WITNESS_TYPE_STRING, signature);
+    function execute(SenderOrder calldata _senderOrder) external {
+        SenderOrderDetail memory orderDetail = abi.decode(_senderOrder.order, (SenderOrderDetail));
+        permit2.permitWitnessTransferFrom(orderDetail.permit, orderDetail.transferDetails, orderDetail.owner, orderDetail.witness, WITNESS_TYPE_STRING, _senderOrder.signature);
     }
 }
