@@ -12,11 +12,17 @@ import {StructBuilder} from "./utils/StructBuilder.sol";
 import {Verifier} from "../src/Verifier.sol";
 import {SenderOrder, SenderOrderDetail} from "../src/OrderStructs.sol";
 
+error InvalidNonce();
+
 contract VeriferTest is Test, PermitSignature {
     using AddressBuilder for address[];
 
     struct Witness {
         address recipient;
+    }
+
+    struct InvalidWitness {
+        uint256 amount;
     }
 
     string public constant PERMIT_BATCH_WITNESS_TRANSFER_TYPEHASH_STUB =
@@ -108,6 +114,81 @@ contract VeriferTest is Test, PermitSignature {
         assertEq(feeReceiverToken1After, feeReceiverToken1Before + DEFAULT_AMOUNT);
     }
 
+    function test_execute_different_recipient_with_random_nonce(uint256 _nonce) public {
+        Witness memory witnessData = Witness(recipient);
+        bytes32 witness = keccak256(abi.encode(witnessData));
+        address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
+        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, _nonce, DEFAULT_AMOUNT);
+
+        bytes memory sig = getPermitBatchWitnessSignature(
+            permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(verifier)
+        );
+
+        address[] memory to = AddressBuilder.fill(1, address(recipient)).push(address(feeReceiver));
+        ISignatureTransfer.SignatureTransferDetails[] memory toAmountPairs =
+            StructBuilder.fillSigTransferDetails(DEFAULT_AMOUNT, to);
+
+        SenderOrder memory senderOrder = _getSenderOrder(permit, toAmountPairs, sender, witness, sig);
+
+        uint256 senderToken1Before = token1.balanceOf(sender);
+        uint256 recipientToken1Before = token1.balanceOf(recipient);
+        uint256 feeReceiverToken1Before = token1.balanceOf(feeReceiver);
+        assertEq(recipientToken1Before, 0);
+        assertEq(feeReceiverToken1Before, 0);
+
+        verifier.execute(senderOrder);
+
+        uint256 senderToken1After = token1.balanceOf(sender);
+        uint256 recipientToken1After = token1.balanceOf(recipient);
+        uint256 feeReceiverToken1After = token1.balanceOf(feeReceiver);
+        assertEq(senderToken1After, senderToken1Before - DEFAULT_AMOUNT * 2);
+        assertEq(recipientToken1After, recipientToken1Before + DEFAULT_AMOUNT);
+        assertEq(feeReceiverToken1After, feeReceiverToken1Before + DEFAULT_AMOUNT);
+    }
+
+    function test_execute_different_recipient_with_random_amount(uint256 _amount) public {
+        vm.assume(_amount / 2 == 0);
+
+        MockERC20 token3 = new MockERC20("token3", "TOKEN3");
+        token3.mint(sender, _amount);
+        vm.prank(sender);
+        token3.approve(permit2, type(uint256).max);
+
+        uint256 nonce = 0;
+        Witness memory witnessData = Witness(recipient);
+        bytes32 witness = keccak256(abi.encode(witnessData));
+        address[] memory tokens = AddressBuilder.fill(1, address(token3)).push(address(token3));
+        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT);
+
+        bytes memory sig = getPermitBatchWitnessSignature(
+            permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(verifier)
+        );
+
+        uint256 amountForEachReceiver = _amount / 2;
+        address[] memory to = AddressBuilder.fill(1, address(recipient)).push(address(feeReceiver));
+        ISignatureTransfer.SignatureTransferDetails[] memory toAmountPairs =
+            StructBuilder.fillSigTransferDetails(amountForEachReceiver, to);
+
+        SenderOrder memory senderOrder = _getSenderOrder(permit, toAmountPairs, sender, witness, sig);
+
+        uint256 senderToken3Before = token3.balanceOf(sender);
+        uint256 recipientToken3Before = token3.balanceOf(recipient);
+        uint256 feeReceiverToken3Before = token3.balanceOf(feeReceiver);
+        assertEq(recipientToken3Before, 0);
+        assertEq(feeReceiverToken3Before, 0);
+
+        verifier.execute(senderOrder);
+
+        uint256 senderToken3After = token3.balanceOf(sender);
+        uint256 recipientToken3After = token3.balanceOf(recipient);
+        uint256 feeReceiverToken3After = token3.balanceOf(feeReceiver);
+        assertEq(senderToken3After, senderToken3Before - amountForEachReceiver * 2);
+        assertEq(recipientToken3After, recipientToken3Before + amountForEachReceiver);
+        assertEq(feeReceiverToken3After, feeReceiverToken3Before + amountForEachReceiver);
+    }
+
+    // TODO: add test to transfer less tokens than defined.
+
     function test_execute_different_recipient_different_token() public {
         uint256 nonce = 0;
         Witness memory witnessData = Witness(recipient);
@@ -152,7 +233,8 @@ contract VeriferTest is Test, PermitSignature {
         assertEq(feeReceiverToken2After, feeReceiverToken2Before + DEFAULT_AMOUNT);
     }
 
-    function test_invalid_sender_signature_length() public {
+    // tests related to the permit2
+    function test_execute_with_invalid_sender_signature_length() public {
         uint256 nonce = 0;
         Witness memory witnessData = Witness(recipient);
         bytes32 witness = keccak256(abi.encode(witnessData));
@@ -175,13 +257,101 @@ contract VeriferTest is Test, PermitSignature {
         verifier.execute(senderOrder);
     }
 
+    function test_execute_with_used_nonce() public {
+        uint256 nonce = 0;
+        Witness memory witnessData = Witness(recipient);
+        bytes32 witness = keccak256(abi.encode(witnessData));
+        address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
+        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT);
+
+        bytes memory sig = getPermitBatchWitnessSignature(
+            permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(verifier)
+        );
+
+        address[] memory to = AddressBuilder.fill(1, address(recipient)).push(address(feeReceiver));
+        ISignatureTransfer.SignatureTransferDetails[] memory toAmountPairs =
+            StructBuilder.fillSigTransferDetails(DEFAULT_AMOUNT, to);
+
+        SenderOrder memory senderOrder = _getSenderOrder(permit, toAmountPairs, sender, witness, sig);
+
+        verifier.execute(senderOrder);
+
+        vm.expectRevert(InvalidNonce.selector);
+        verifier.execute(senderOrder);
+    }
+
+    function test_execute_with_different_length_of_PermitBatchTransferform_and_transferDetails() public {
+        uint256 nonce = 0;
+        Witness memory witnessData = Witness(recipient);
+        bytes32 witness = keccak256(abi.encode(witnessData));
+        address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
+        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT);
+
+        bytes memory sig = getPermitBatchWitnessSignature(
+            permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(verifier)
+        );
+
+        address[] memory to = AddressBuilder.fill(1, address(recipient));
+        ISignatureTransfer.SignatureTransferDetails[] memory toAmountPairs =
+            StructBuilder.fillSigTransferDetails(DEFAULT_AMOUNT, to);
+
+        SenderOrder memory senderOrder = _getSenderOrder(permit, toAmountPairs, sender, witness, sig);
+
+        vm.expectRevert(ISignatureTransfer.LengthMismatch.selector);
+        verifier.execute(senderOrder);
+    }
+
+    function test_execute_revert_if_typeHash_is_invalid() public {
+        uint256 nonce = 0;
+        Witness memory witnessData = Witness(recipient);
+        bytes32 witness = keccak256(abi.encode(witnessData));
+        address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
+        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT);
+
+        bytes memory sig = getPermitBatchWitnessSignature(
+            permit, senderPrivateKey, "invalid typedHash", witness, DOMAIN_SEPARATOR, address(verifier)
+        );
+
+        address[] memory to = AddressBuilder.fill(1, address(recipient)).push(address(feeReceiver));
+        ISignatureTransfer.SignatureTransferDetails[] memory toAmountPairs =
+            StructBuilder.fillSigTransferDetails(DEFAULT_AMOUNT, to);
+
+        SenderOrder memory senderOrder = _getSenderOrder(permit, toAmountPairs, sender, witness, sig);
+
+        vm.expectRevert(SignatureVerification.InvalidSigner.selector);
+        verifier.execute(senderOrder);
+    }
+
+    function test_execute_revert_if_willness_is_invalid() public {
+        uint256 nonce = 0;
+        Witness memory witnessData = Witness(recipient);
+        bytes32 witness = keccak256(abi.encode(witnessData));
+        address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
+        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT);
+
+        bytes memory sig = getPermitBatchWitnessSignature(
+            permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(verifier)
+        );
+
+        address[] memory to = AddressBuilder.fill(1, address(recipient)).push(address(feeReceiver));
+        ISignatureTransfer.SignatureTransferDetails[] memory toAmountPairs =
+            StructBuilder.fillSigTransferDetails(DEFAULT_AMOUNT, to);
+
+        InvalidWitness memory wrongData = InvalidWitness({amount: 1 ether});
+        bytes32 invalidWitness = keccak256(abi.encode(wrongData));
+        SenderOrder memory senderOrder = _getSenderOrder(permit, toAmountPairs, sender, invalidWitness, sig);
+
+        vm.expectRevert(SignatureVerification.InvalidSigner.selector);
+        verifier.execute(senderOrder);
+    }
+
     function _getSenderOrder(
         ISignatureTransfer.PermitBatchTransferFrom memory _permit,
         ISignatureTransfer.SignatureTransferDetails[] memory _toAmountPairs,
         address _owner,
         bytes32 _witness,
         bytes memory _signature
-    ) private returns (SenderOrder memory) {
+    ) private pure returns (SenderOrder memory) {
         SenderOrder memory senderOrder =
             SenderOrder(abi.encode(SenderOrderDetail(_permit, _toAmountPairs, _owner, _witness)), _signature);
 

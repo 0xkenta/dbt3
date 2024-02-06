@@ -15,7 +15,7 @@ contract PermitSignature {
         bytes32 witness,
         bytes32 domainSeparator,
         address spender
-    ) internal view returns (bytes memory sig) {
+    ) internal pure returns (bytes memory sig) {
         bytes32[] memory tokenPermissions = new bytes32[](permit.permitted.length);
         for (uint256 i = 0; i < permit.permitted.length; ++i) {
             tokenPermissions[i] = keccak256(abi.encode(_TOKEN_PERMISSIONS_TYPEHASH, permit.permitted[i]));
