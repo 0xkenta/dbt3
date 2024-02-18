@@ -19,7 +19,7 @@ contract DomainBasedTransferExecutor is EIP712 {
 
     event Executed(uint256 indexed orderId);
 
-    constructor(address _permit2) EIP712("domainBasedTramsferPrototype", "0.0.1") {
+    constructor(address _permit2) EIP712("MycelDomainBasedTransfer", "1") {
         permit2 = IPermit2(_permit2);
     }
 
@@ -31,7 +31,7 @@ contract DomainBasedTransferExecutor is EIP712 {
         /// validation for the recipient address
         _validateRecipient(senderOrderDetail.witness, recipientOrderDetail, _recipientOrder.signature);
 
-        /// validation for the amount
+        /// validation for the transfer amount
         _validateTransferAmount(senderOrderDetail.transferDetails[0].requestedAmount, recipientOrderDetail.amount);
 
         /// validation for the orderId
