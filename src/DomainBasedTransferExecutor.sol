@@ -8,7 +8,7 @@ import {ISignatureTransfer} from "permit2/interfaces/ISignatureTransfer.sol";
 import {InvalidRecipient, InvalidTransferAmount, InvalidOrderId} from "./Errors.sol";
 import {SenderOrder, SenderOrderDetail, RecipientOrder, RecipientOrderDetail, Witness} from "./OrderStructs.sol";
 
-contract Verifier is EIP712 {
+contract DomainBasedTransferExecutor is EIP712 {
     bytes32 internal constant RECIPIENT_ORDER_DETAIL_TYPEHASH =
         keccak256("RecipientOrderDetail(address to,uint256 amount,uint256 id)");
 
@@ -50,7 +50,7 @@ contract Verifier is EIP712 {
     }
 
     function _validateRecipient(
-        bytes32 _witness,
+        bytes32 _senderOrderWitness,
         RecipientOrderDetail memory _recipientOrderDetail,
         bytes calldata _recipientSignature
     ) private view {
@@ -67,10 +67,10 @@ contract Verifier is EIP712 {
 
         address signer = ECDSA.recover(digest, _recipientSignature);
 
-        Witness memory witnessData = Witness({recipient: signer});
-        bytes32 witness = keccak256(abi.encode(witnessData));
+        Witness memory witness = Witness({recipient: signer});
+        bytes32 witnessWithSigner = keccak256(abi.encode(witness));
 
-        if (_witness != witness) revert InvalidRecipient();
+        if (_senderOrderWitness != witnessWithSigner) revert InvalidRecipient();
     }
 
     function _validateTransferAmount(uint256 _requestedAmount, uint256 _recipientSignedAmount) private pure {
