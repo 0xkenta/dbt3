@@ -8,6 +8,10 @@ import {ISignatureTransfer} from "permit2/interfaces/ISignatureTransfer.sol";
 import {InvalidRecipient, InvalidTransferAmount, InvalidOrderId} from "./Errors.sol";
 import {SenderOrder, SenderOrderDetail, RecipientOrder, RecipientOrderDetail, Witness} from "./OrderStructs.sol";
 
+/// @title Domain Based Transfer
+/// @author Mycel team
+/// @notice This contract facilitates the transfer of ERC20 tokens based on the sender and the recipient order.
+
 contract DomainBasedTransferExecutor is EIP712 {
     bytes32 internal constant RECIPIENT_ORDER_DETAIL_TYPEHASH =
         keccak256("RecipientOrderDetail(address to,uint256 amount,uint256 id)");
@@ -49,6 +53,8 @@ contract DomainBasedTransferExecutor is EIP712 {
         emit Executed(recipientOrderDetail.id);
     }
 
+    /// @notice recover the recipient order signer and check whether the witness recipient and the recovered signer address are the same.
+    /// @dev revert if there is no match between the witness.recipient and the recipient order signer address.
     function _validateRecipient(
         bytes32 _senderOrderWitness,
         RecipientOrderDetail memory _recipientOrderDetail,
@@ -73,10 +79,14 @@ contract DomainBasedTransferExecutor is EIP712 {
         if (_senderOrderWitness != witnessWithSigner) revert InvalidRecipient();
     }
 
+    /// @notice verify whether the transfer amount to the recipient is correct.
+    /// @dev revert if there is no match between the api created requestAmount and the recipient signed amount.
     function _validateTransferAmount(uint256 _requestedAmount, uint256 _recipientSignedAmount) private pure {
         if (_requestedAmount != _recipientSignedAmount) revert InvalidTransferAmount();
     }
 
+    /// @notice verify whether the sender order nonce and the recipient order id are the same.
+    /// @dev revert if there is no match between the sender order nonce and the recipient order id.
     function _validateOrderId(uint256 _senderOrderId, uint256 _recipientOrderId) private pure {
         if (_senderOrderId != _recipientOrderId) revert InvalidOrderId();
     }
