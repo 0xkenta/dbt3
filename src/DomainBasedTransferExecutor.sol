@@ -26,6 +26,10 @@ contract DomainBasedTransferExecutor is EIP712 {
         permit2 = IPermit2(_permit2);
     }
 
+    /// @notice This function is responsible for transferring ERC20 tokens based on the sender and the recipient order.
+    /// @dev there are 3 validations for the recipient address, the transfer amount and the nonce/order id.
+    /// @param _senderOrder the encoded SenderOrderDeail and the sender signature
+    /// @param _recipientOrder the encoded RecipientOrderDetail and the recipient signature
     function execute(SenderOrder calldata _senderOrder, RecipientOrder calldata _recipientOrder) external {
         SenderOrderDetail memory senderOrderDetail = abi.decode(_senderOrder.order, (SenderOrderDetail));
 
