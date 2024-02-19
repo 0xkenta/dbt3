@@ -28,13 +28,13 @@ contract DomainBasedTransferExecutor is EIP712 {
 
         RecipientOrderDetail memory recipientOrderDetail = abi.decode(_recipientOrder.order, (RecipientOrderDetail));
 
-        /// validation for the recipient address
+        /// validation for the recipient address. check whether the witness.recipient and the recipientOrder signer are the same address.
         _validateRecipient(senderOrderDetail.witness, recipientOrderDetail, _recipientOrder.signature);
 
-        /// validation for the transfer amount
+        /// validation for the transfer amount. check whether the api created requestAmount and the recipient signed amount are the same.
         _validateTransferAmount(senderOrderDetail.transferDetails[0].requestedAmount, recipientOrderDetail.amount);
 
-        /// validation for the orderId
+        /// validation for the orderId. check whether the sender order nonce and the recipient order id are the same.
         _validateOrderId(senderOrderDetail.permit.nonce, recipientOrderDetail.id);
 
         permit2.permitWitnessTransferFrom(
