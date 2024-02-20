@@ -22,7 +22,7 @@ contract DomainBasedTransferExecutor is EIP712 {
 
     event Executed(uint256 indexed orderId);
 
-    constructor(address _permit2) EIP712("MycelDomainBasedTransfer", "1") {
+    constructor(address _permit2) EIP712("ID-BasedTransfer", "1") {
         permit2 = IPermit2(_permit2);
     }
 
