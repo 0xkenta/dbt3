@@ -532,6 +532,14 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
         executor.execute(senderOrder, recipientOrder);
     }
 
+    function test_grant_role_to_other_by_DEFAULT_ADMIN_ROLE() public {
+        assertTrue(!executor.hasRole(executor.EXECUTOR_ROLE(), other));
+
+        executor.grantRole(executor.EXECUTOR_ROLE(), other);
+
+        assertTrue(executor.hasRole(executor.EXECUTOR_ROLE(), other));
+    }
+
     function _getSenderOrder(
         ISignatureTransfer.PermitBatchTransferFrom memory _permit,
         ISignatureTransfer.SignatureTransferDetails[] memory _toAmountPairs,
