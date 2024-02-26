@@ -13,6 +13,7 @@ import {DomainBasedTransferExecutor} from "../src/DomainBasedTransferExecutor.so
 import {SenderOrder, SenderOrderDetail, RecipientOrder, RecipientOrderDetail} from "../src/OrderStructs.sol";
 import {InvalidRecipient, InvalidTransferAmount, InvalidOrderId} from "../src/Errors.sol";
 
+error AccessControlUnauthorizedAccount(address account, bytes32 neededRole);
 error InvalidNonce();
 
 contract MockExecutor is DomainBasedTransferExecutor {
@@ -66,6 +67,7 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
     address public recipient;
     uint256 public recipientPrivateKey;
 
+    address public other;
     uint256 public otherPrivateKey;
 
     address toAddress = address(0x1);
@@ -87,6 +89,7 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
         recipient = vm.addr(recipientPrivateKey);
 
         otherPrivateKey = 0x12345679;
+        other = vm.addr(otherPrivateKey);
 
         token1.mint(sender, DEFAULT_BALANCE);
         token2.mint(sender, DEFAULT_BALANCE);
@@ -101,6 +104,8 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
         assertEq(address(executor.permit2()), permit2);
         assertEq(token1.balanceOf(sender), DEFAULT_BALANCE);
         assertEq(token2.balanceOf(sender), DEFAULT_BALANCE);
+        assertTrue(executor.hasRole(executor.DEFAULT_ADMIN_ROLE(), address(this)));
+        assertTrue(executor.hasRole(executor.EXECUTOR_ROLE(), address(this)));
     }
 
     function test_witnessTypeHashes() public {
@@ -203,6 +208,29 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
         vm.expectEmit(true, false, false, true);
         emit Executed(nonce);
         executor.execute(senderOrder, recipientOrder);
+    }
+
+    function test_execute_revert_if_caller_has_no_executor_role() public {
+        uint256 nonce = uint256(keccak256(abi.encodePacked(address(executor), sender, block.timestamp)));
+        Witness memory witnessData = Witness(recipient);
+        bytes32 witness = keccak256(abi.encode(witnessData));
+        address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
+        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT);
+
+        bytes memory sig = getPermitBatchWitnessSignature(
+            permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(executor)
+        );
+
+        address[] memory to = AddressBuilder.fill(1, address(recipient)).push(address(feeReceiver));
+        ISignatureTransfer.SignatureTransferDetails[] memory toAmountPairs =
+            StructBuilder.fillSigTransferDetails(DEFAULT_AMOUNT, DEFAULT_AMOUNT, to);
+
+        SenderOrder memory senderOrder = _getSenderOrder(permit, toAmountPairs, sender, witness, sig);
+        RecipientOrder memory recipientOrder = _getRecipientOrder(recipient, DEFAULT_AMOUNT, nonce, recipientPrivateKey);
+
+        vm.expectRevert(abi.encodeWithSelector(AccessControlUnauthorizedAccount.selector, other, executor.EXECUTOR_ROLE()));
+        vm.prank(other);
+        executor.execute(senderOrder, recipientOrder);  
     }
 
     /// tests for the validation: _validateRecipient

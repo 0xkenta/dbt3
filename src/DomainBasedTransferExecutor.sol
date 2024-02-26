@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.23;
 
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IPermit2} from "permit2/interfaces/IPermit2.sol";
@@ -11,7 +12,9 @@ import {SenderOrder, SenderOrderDetail, RecipientOrder, RecipientOrderDetail, Wi
 /// @title Domain Based Transfer
 /// @author Mycel team
 /// @notice This contract facilitates the transfer of ERC20 tokens based on the sender and the recipient order.
-contract DomainBasedTransferExecutor is EIP712 {
+contract DomainBasedTransferExecutor is AccessControl, EIP712 {
+    bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
+
     bytes32 internal constant RECIPIENT_ORDER_DETAIL_TYPEHASH =
         keccak256("RecipientOrderDetail(address to,uint256 amount,uint256 id)");
 
@@ -24,13 +27,16 @@ contract DomainBasedTransferExecutor is EIP712 {
 
     constructor(address _permit2) EIP712("ID-BasedTransfer", "1") {
         permit2 = IPermit2(_permit2);
+
+        _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(EXECUTOR_ROLE, msg.sender);
     }
 
     /// @notice This function is responsible for transferring ERC20 tokens based on the sender and the recipient order.
     /// @dev there are 3 validations for the recipient address, the transfer amount and the nonce/order id.
     /// @param _senderOrder the encoded SenderOrderDeail and the sender signature
     /// @param _recipientOrder the encoded RecipientOrderDetail and the recipient signature
-    function execute(SenderOrder calldata _senderOrder, RecipientOrder calldata _recipientOrder) external {
+    function execute(SenderOrder calldata _senderOrder, RecipientOrder calldata _recipientOrder) external onlyRole(EXECUTOR_ROLE) {
         SenderOrderDetail memory senderOrderDetail = abi.decode(_senderOrder.order, (SenderOrderDetail));
 
         RecipientOrderDetail memory recipientOrderDetail = abi.decode(_recipientOrder.order, (RecipientOrderDetail));
