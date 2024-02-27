@@ -42,7 +42,7 @@ contract PermitSignature {
         return bytes.concat(r, s, bytes1(v));
     }
 
-    function getPermitTransferFrom(address[] memory tokens, uint256 nonce, uint256 amount)
+    function getPermitTransferFrom(address[] memory tokens, uint256 nonce, uint256 amount, uint256 currentTime)
         internal
         view
         returns (ISignatureTransfer.PermitBatchTransferFrom memory)
@@ -55,7 +55,7 @@ contract PermitSignature {
         return ISignatureTransfer.PermitBatchTransferFrom({
             permitted: permitted,
             nonce: nonce,
-            deadline: block.timestamp + 100
+            deadline: currentTime + 100
         });
     }
 }

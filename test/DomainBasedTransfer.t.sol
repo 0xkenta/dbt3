@@ -15,6 +15,7 @@ import {InvalidRecipient, InvalidTransferAmount, InvalidOrderId} from "../src/Er
 
 error AccessControlUnauthorizedAccount(address account, bytes32 neededRole);
 error InvalidNonce();
+error SignatureExpired(uint256 signatureDeadline);
 
 contract MockExecutor is DomainBasedTransferExecutor {
     constructor(address _permit2) DomainBasedTransferExecutor(_permit2) {}
@@ -73,6 +74,8 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
     address toAddress = address(0x1);
     address feeReceiver = address(0x2);
 
+    uint256 public currentTime;
+
     event Executed(uint256 indexed orderId);
 
     function setUp() public {
@@ -98,6 +101,8 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
         token1.approve(permit2, type(uint256).max);
         token2.approve(permit2, type(uint256).max);
         vm.stopPrank();
+
+        currentTime = block.timestamp;
     }
 
     function test_initialize() public {
@@ -120,7 +125,8 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
         Witness memory witnessData = Witness(recipient);
         bytes32 witness = keccak256(abi.encode(witnessData));
         address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
-        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT);
+        ISignatureTransfer.PermitBatchTransferFrom memory permit =
+            getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT, currentTime);
 
         bytes memory sig = getPermitBatchWitnessSignature(
             permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(executor)
@@ -154,7 +160,8 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
         Witness memory witnessData = Witness(recipient);
         bytes32 witness = keccak256(abi.encode(witnessData));
         address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
-        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT);
+        ISignatureTransfer.PermitBatchTransferFrom memory permit =
+            getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT, currentTime);
 
         bytes memory sig = getPermitBatchWitnessSignature(
             permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(executor)
@@ -192,7 +199,8 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
         Witness memory witnessData = Witness(recipient);
         bytes32 witness = keccak256(abi.encode(witnessData));
         address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
-        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT);
+        ISignatureTransfer.PermitBatchTransferFrom memory permit =
+            getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT, currentTime);
 
         bytes memory sig = getPermitBatchWitnessSignature(
             permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(executor)
@@ -215,7 +223,8 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
         Witness memory witnessData = Witness(recipient);
         bytes32 witness = keccak256(abi.encode(witnessData));
         address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
-        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT);
+        ISignatureTransfer.PermitBatchTransferFrom memory permit =
+            getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT, currentTime);
 
         bytes memory sig = getPermitBatchWitnessSignature(
             permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(executor)
@@ -228,9 +237,11 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
         SenderOrder memory senderOrder = _getSenderOrder(permit, toAmountPairs, sender, witness, sig);
         RecipientOrder memory recipientOrder = _getRecipientOrder(recipient, DEFAULT_AMOUNT, nonce, recipientPrivateKey);
 
-        vm.expectRevert(abi.encodeWithSelector(AccessControlUnauthorizedAccount.selector, other, executor.EXECUTOR_ROLE()));
+        vm.expectRevert(
+            abi.encodeWithSelector(AccessControlUnauthorizedAccount.selector, other, executor.EXECUTOR_ROLE())
+        );
         vm.prank(other);
-        executor.execute(senderOrder, recipientOrder);  
+        executor.execute(senderOrder, recipientOrder);
     }
 
     /// tests for the validation: _validateRecipient
@@ -243,7 +254,8 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
         Witness memory witnessData = Witness(randomRecipient);
         bytes32 witness = keccak256(abi.encode(witnessData));
         address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
-        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT);
+        ISignatureTransfer.PermitBatchTransferFrom memory permit =
+            getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT, currentTime);
 
         bytes memory sig = getPermitBatchWitnessSignature(
             permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(executor)
@@ -277,7 +289,8 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
         Witness memory witnessData = Witness(recipient);
         bytes32 witness = keccak256(abi.encode(witnessData));
         address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
-        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT);
+        ISignatureTransfer.PermitBatchTransferFrom memory permit =
+            getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT, currentTime);
 
         bytes memory sig = getPermitBatchWitnessSignature(
             permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(executor)
@@ -299,7 +312,8 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
         Witness memory witnessData = Witness(recipient);
         bytes32 witness = keccak256(abi.encode(witnessData));
         address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
-        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT);
+        ISignatureTransfer.PermitBatchTransferFrom memory permit =
+            getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT, currentTime);
 
         bytes memory sig = getPermitBatchWitnessSignature(
             permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(executor)
@@ -325,7 +339,8 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
         Witness memory witnessData = Witness(recipient);
         bytes32 witness = keccak256(abi.encode(witnessData));
         address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
-        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT);
+        ISignatureTransfer.PermitBatchTransferFrom memory permit =
+            getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT, currentTime);
 
         bytes memory sig = getPermitBatchWitnessSignature(
             permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(executor)
@@ -359,7 +374,8 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
         Witness memory witnessData = Witness(recipient);
         bytes32 witness = keccak256(abi.encode(witnessData));
         address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
-        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT);
+        ISignatureTransfer.PermitBatchTransferFrom memory permit =
+            getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT, currentTime);
 
         bytes memory sig = getPermitBatchWitnessSignature(
             permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(executor)
@@ -383,7 +399,8 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
         Witness memory witnessData = Witness(recipient);
         bytes32 witness = keccak256(abi.encode(witnessData));
         address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
-        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT);
+        ISignatureTransfer.PermitBatchTransferFrom memory permit =
+            getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT, currentTime);
 
         bytes memory sig = getPermitBatchWitnessSignature(
             permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(executor)
@@ -419,7 +436,8 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
         Witness memory witnessData = Witness(recipient);
         bytes32 witness = keccak256(abi.encode(witnessData));
         address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
-        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT);
+        ISignatureTransfer.PermitBatchTransferFrom memory permit =
+            getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT, currentTime);
 
         bytes memory sig = getPermitBatchWitnessSignature(
             permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(executor)
@@ -444,7 +462,8 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
         Witness memory witnessData = Witness(recipient);
         bytes32 witness = keccak256(abi.encode(witnessData));
         address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
-        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT);
+        ISignatureTransfer.PermitBatchTransferFrom memory permit =
+            getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT, currentTime);
 
         bytes memory sig = getPermitBatchWitnessSignature(
             permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(executor)
@@ -464,12 +483,37 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
         executor.execute(senderOrder, recipientOrder);
     }
 
+    function test_execute_revert_if_permit_deadline_is_over() public {
+        uint256 nonce = uint256(keccak256(abi.encodePacked(address(executor), sender, block.timestamp)));
+        Witness memory witnessData = Witness(recipient);
+        bytes32 witness = keccak256(abi.encode(witnessData));
+        address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
+        ISignatureTransfer.PermitBatchTransferFrom memory permit =
+            getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT, currentTime);
+
+        bytes memory sig = getPermitBatchWitnessSignature(
+            permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(executor)
+        );
+
+        address[] memory to = AddressBuilder.fill(1, address(recipient)).push(address(feeReceiver));
+        ISignatureTransfer.SignatureTransferDetails[] memory toAmountPairs =
+            StructBuilder.fillSigTransferDetails(DEFAULT_AMOUNT, DEFAULT_AMOUNT, to);
+
+        SenderOrder memory senderOrder = _getSenderOrder(permit, toAmountPairs, sender, witness, sig);
+        RecipientOrder memory recipientOrder = _getRecipientOrder(recipient, DEFAULT_AMOUNT, nonce, recipientPrivateKey);
+
+        skip(101);
+        vm.expectRevert(abi.encodeWithSelector(SignatureExpired.selector, currentTime + 100));
+        executor.execute(senderOrder, recipientOrder);
+    }
+
     function test_execute_revert_if_used_nonce_given() public {
         uint256 nonce = uint256(keccak256(abi.encodePacked(address(executor), sender, block.timestamp)));
         Witness memory witnessData = Witness(recipient);
         bytes32 witness = keccak256(abi.encode(witnessData));
         address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
-        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT);
+        ISignatureTransfer.PermitBatchTransferFrom memory permit =
+            getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT, currentTime);
 
         bytes memory sig = getPermitBatchWitnessSignature(
             permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(executor)
@@ -493,7 +537,8 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
         Witness memory witnessData = Witness(recipient);
         bytes32 witness = keccak256(abi.encode(witnessData));
         address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
-        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT);
+        ISignatureTransfer.PermitBatchTransferFrom memory permit =
+            getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT, currentTime);
 
         bytes memory sig = getPermitBatchWitnessSignature(
             permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(executor)
@@ -515,7 +560,8 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
         Witness memory witnessData = Witness(recipient);
         bytes32 witness = keccak256(abi.encode(witnessData));
         address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
-        ISignatureTransfer.PermitBatchTransferFrom memory permit = getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT);
+        ISignatureTransfer.PermitBatchTransferFrom memory permit =
+            getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT, currentTime);
 
         bytes memory sig = getPermitBatchWitnessSignature(
             permit, senderPrivateKey, "invalid typedHash", witness, DOMAIN_SEPARATOR, address(executor)

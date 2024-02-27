@@ -36,7 +36,10 @@ contract DomainBasedTransferExecutor is AccessControl, EIP712 {
     /// @dev there are 3 validations for the recipient address, the transfer amount and the nonce/order id.
     /// @param _senderOrder the encoded SenderOrderDeail and the sender signature
     /// @param _recipientOrder the encoded RecipientOrderDetail and the recipient signature
-    function execute(SenderOrder calldata _senderOrder, RecipientOrder calldata _recipientOrder) external onlyRole(EXECUTOR_ROLE) {
+    function execute(SenderOrder calldata _senderOrder, RecipientOrder calldata _recipientOrder)
+        external
+        onlyRole(EXECUTOR_ROLE)
+    {
         SenderOrderDetail memory senderOrderDetail = abi.decode(_senderOrder.order, (SenderOrderDetail));
 
         RecipientOrderDetail memory recipientOrderDetail = abi.decode(_recipientOrder.order, (RecipientOrderDetail));
