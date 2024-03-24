@@ -32,6 +32,24 @@ contract DomainBasedTransferExecutor is AccessControl, EIP712 {
         _grantRole(EXECUTOR_ROLE, msg.sender);
     }
 
+    /// @notice This function is responsible for transferring ERC20 tokens based only on the sender order.
+    /// @dev The recipient has already defined the address to which he wants to receive the transferred ERC20 token. So there is no need to validate the recipient order to transfer the token.
+    /// @param _senderOrder the encoded SenderOrderDeail and the sender signature
+    function execute(SenderOrder calldata _senderOrder) external onlyRole(EXECUTOR_ROLE) {
+        SenderOrderDetail memory senderOrderDetail = abi.decode(_senderOrder.order, (SenderOrderDetail));
+
+        permit2.permitWitnessTransferFrom(
+            senderOrderDetail.permit,
+            senderOrderDetail.transferDetails,
+            senderOrderDetail.owner,
+            senderOrderDetail.witness,
+            WITNESS_TYPE_STRING,
+            _senderOrder.signature
+        );
+
+        emit Executed(senderOrderDetail.permit.nonce);
+    }
+
     /// @notice This function is responsible for transferring ERC20 tokens based on the sender and the recipient order.
     /// @dev there are 3 validations for the recipient address, the transfer amount and the nonce/order id.
     /// @param _senderOrder the encoded SenderOrderDeail and the sender signature
@@ -62,7 +80,7 @@ contract DomainBasedTransferExecutor is AccessControl, EIP712 {
             _senderOrder.signature
         );
 
-        emit Executed(recipientOrderDetail.id);
+        emit Executed(senderOrderDetail.permit.nonce);
     }
 
     /// @notice recover the recipient order signer and check whether the witness recipient and the recovered signer address are the same.

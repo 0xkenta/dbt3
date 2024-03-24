@@ -65,6 +65,8 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
     address public sender;
     uint256 public senderPrivateKey;
 
+    address public defaultDefinedAddress;
+
     address public recipient;
     uint256 public recipientPrivateKey;
 
@@ -87,6 +89,8 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
 
         senderPrivateKey = 0x12341234;
         sender = vm.addr(senderPrivateKey);
+
+        defaultDefinedAddress = vm.addr(1);
 
         recipientPrivateKey = 0x12345678;
         recipient = vm.addr(recipientPrivateKey);
@@ -118,6 +122,92 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
             keccak256(abi.encodePacked(PERMIT_BATCH_WITNESS_TRANSFER_TYPEHASH_STUB, executor.WITNESS_TYPE_STRING())),
             WITNESS_BATCH_TYPEHASH
         );
+    }
+
+    function test_execute_with_default_address_revert_if_caller_has_no_executor_role() public {
+        uint256 nonce = uint256(keccak256(abi.encodePacked(address(executor), sender, block.timestamp)));
+        Witness memory witnessData = Witness(recipient);
+        bytes32 witness = keccak256(abi.encode(witnessData));
+        address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
+        ISignatureTransfer.PermitBatchTransferFrom memory permit =
+            getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT, deadline);
+
+        bytes memory sig = getPermitBatchWitnessSignature(
+            permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(executor)
+        );
+
+        address[] memory to = AddressBuilder.fill(1, defaultDefinedAddress).push(address(feeReceiver));
+        ISignatureTransfer.SignatureTransferDetails[] memory toAmountPairs =
+            StructBuilder.fillSigTransferDetails(DEFAULT_AMOUNT, DEFAULT_AMOUNT, to);
+
+        SenderOrder memory senderOrder = _getSenderOrder(permit, toAmountPairs, sender, witness, sig);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(AccessControlUnauthorizedAccount.selector, other, executor.EXECUTOR_ROLE())
+        );
+        vm.prank(other);
+        executor.execute(senderOrder);
+    }
+
+    function test_execute_with_default_address_transfer_to_default_defined_address() public {
+        uint256 nonce = uint256(keccak256(abi.encodePacked(address(executor), sender, block.timestamp)));
+        Witness memory witnessData = Witness(recipient);
+        bytes32 witness = keccak256(abi.encode(witnessData));
+        address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
+        ISignatureTransfer.PermitBatchTransferFrom memory permit =
+            getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT, deadline);
+
+        bytes memory sig = getPermitBatchWitnessSignature(
+            permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(executor)
+        );
+
+        address[] memory to = AddressBuilder.fill(1, defaultDefinedAddress).push(address(feeReceiver));
+        ISignatureTransfer.SignatureTransferDetails[] memory toAmountPairs =
+            StructBuilder.fillSigTransferDetails(DEFAULT_AMOUNT, DEFAULT_AMOUNT, to);
+
+        SenderOrder memory senderOrder = _getSenderOrder(permit, toAmountPairs, sender, witness, sig);
+
+        uint256 senderToken1Before = token1.balanceOf(sender);
+        uint256 recipientToken1Before = token1.balanceOf(recipient);
+        uint256 defaultAddressToken1Before = token1.balanceOf(defaultDefinedAddress);
+        uint256 feeReceiverToken1Before = token1.balanceOf(feeReceiver);
+        assertEq(recipientToken1Before, 0);
+        assertEq(defaultAddressToken1Before, 0);
+        assertEq(feeReceiverToken1Before, 0);
+
+        executor.execute(senderOrder);
+
+        uint256 senderToken1After = token1.balanceOf(sender);
+        uint256 recipientToken1After = token1.balanceOf(recipient);
+        uint256 defaultAddressToken1After = token1.balanceOf(defaultDefinedAddress);
+        uint256 feeReceiverToken1After = token1.balanceOf(feeReceiver);
+        assertEq(senderToken1After, senderToken1Before - DEFAULT_AMOUNT * 2);
+        assertEq(recipientToken1After, recipientToken1Before);
+        assertEq(defaultAddressToken1After, defaultAddressToken1Before + DEFAULT_AMOUNT);
+        assertEq(feeReceiverToken1After, feeReceiverToken1Before + DEFAULT_AMOUNT);
+    }
+
+    function test_execute_with_default_address_emit_Executed_event() public {
+        uint256 nonce = uint256(keccak256(abi.encodePacked(address(executor), sender, block.timestamp)));
+        Witness memory witnessData = Witness(recipient);
+        bytes32 witness = keccak256(abi.encode(witnessData));
+        address[] memory tokens = AddressBuilder.fill(1, address(token1)).push(address(token1));
+        ISignatureTransfer.PermitBatchTransferFrom memory permit =
+            getPermitTransferFrom(tokens, nonce, DEFAULT_AMOUNT, deadline);
+
+        bytes memory sig = getPermitBatchWitnessSignature(
+            permit, senderPrivateKey, WITNESS_BATCH_TYPEHASH, witness, DOMAIN_SEPARATOR, address(executor)
+        );
+
+        address[] memory to = AddressBuilder.fill(1, defaultDefinedAddress).push(address(feeReceiver));
+        ISignatureTransfer.SignatureTransferDetails[] memory toAmountPairs =
+            StructBuilder.fillSigTransferDetails(DEFAULT_AMOUNT, DEFAULT_AMOUNT, to);
+
+        SenderOrder memory senderOrder = _getSenderOrder(permit, toAmountPairs, sender, witness, sig);
+
+        vm.expectEmit(true, false, false, true);
+        emit Executed(nonce);
+        executor.execute(senderOrder);
     }
 
     function test_execute_transfer_to_recipient_adddress() public {

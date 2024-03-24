@@ -52,10 +52,6 @@ contract PermitSignature {
         for (uint256 i = 0; i < tokens.length; ++i) {
             permitted[i] = ISignatureTransfer.TokenPermissions({token: tokens[i], amount: amount});
         }
-        return ISignatureTransfer.PermitBatchTransferFrom({
-            permitted: permitted,
-            nonce: nonce,
-            deadline: deadline
-        });
+        return ISignatureTransfer.PermitBatchTransferFrom({permitted: permitted, nonce: nonce, deadline: deadline});
     }
 }
