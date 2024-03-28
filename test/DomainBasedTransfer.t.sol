@@ -49,7 +49,7 @@ contract DomainBaseTransferExecutorTest is Test, PermitSignature {
         "PermitBatchWitnessTransferFrom(TokenPermissions[] permitted,address spender,uint256 nonce,uint256 deadline,";
 
     bytes32 constant WITNESS_BATCH_TYPEHASH = keccak256(
-        "PermitBatchWitnessTransferFrom(TokenPermissions[] permitted,address spender,uint256 nonce,uint256 deadline,Witness witness)Witness(address recipient)TokenPermissions(address token,uint256 amount)"
+        "PermitBatchWitnessTransferFrom(TokenPermissions[] permitted,address spender,uint256 nonce,uint256 deadline,Witness witness)TokenPermissions(address token,uint256 amount)Witness(address recipient)"
     );
 
     MockExecutor public executor;

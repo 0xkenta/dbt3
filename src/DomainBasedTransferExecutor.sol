@@ -19,7 +19,7 @@ contract DomainBasedTransferExecutor is AccessControl, EIP712 {
         keccak256("RecipientOrderDetail(address to,uint256 amount,uint256 id)");
 
     string public constant WITNESS_TYPE_STRING =
-        "Witness witness)Witness(address recipient)TokenPermissions(address token,uint256 amount)";
+        "Witness witness)TokenPermissions(address token,uint256 amount)Witness(address recipient)";
 
     IPermit2 public permit2;
 
